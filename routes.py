@@ -1,11 +1,13 @@
 from flask import Blueprint, request, redirect, render_template, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash
-from db.models import User
+from werkzeug.security import generate_password_hash, check_password_hash
+from db.models import User, Genre, Book
 from db.database import session_scope
-from werkzeug.security import check_password_hash
+from sqlalchemy.orm import joinedload
 
-bp = Blueprint('auth', __name__)
+bp = Blueprint('main', __name__)
+
+### --- Аутентификация --- ###
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -18,18 +20,16 @@ def login():
             if user and check_password_hash(user.password_hash, password):
                 session.expunge(user)
                 login_user(user)
-                return redirect(url_for('auth.profile'))
+                return redirect(url_for('main.profile'))
             else:
                 flash('Неправильный email или пароль')
     return render_template('login.html')
-
 
 @bp.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('auth.login'))
-
+    return redirect(url_for('main.login'))
 
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -42,10 +42,9 @@ def register():
         password_hash = generate_password_hash(password)
 
         with session_scope() as session:
-            existing_user = session.query(User).filter_by(email=email).first()
-            if existing_user:
+            if session.query(User).filter_by(email=email).first():
                 flash('Пользователь с таким email уже существует')
-                return redirect(url_for('auth.register'))
+                return redirect(url_for('main.register'))
 
             user = User(
                 username=username,
@@ -56,7 +55,7 @@ def register():
             session.add(user)
 
         flash('Регистрация успешна! Теперь войдите в аккаунт.')
-        return redirect(url_for('auth.login'))
+        return redirect(url_for('main.login'))
 
     return render_template('register.html')
 
@@ -65,8 +64,89 @@ def register():
 def profile():
     return render_template("profile.html", user=current_user)
 
+### --- Вспомогательная функция жанров --- ###
 
+def get_genre_hierarchy(session):
+    root_genres = session.query(Genre).filter_by(parent_id=None).all()
 
+    def serialize(genre):
+        return {
+            'id': genre.id,
+            'name': genre.name,
+            'subgenres': [serialize(sub) for sub in genre.subgenres]
+        }
+
+    return [serialize(g) for g in root_genres]
+
+### --- Главная страница --- ###
+
+@bp.route('/')
+def index():
+    genre_id = request.args.get('genre_id', type=int)
+    search_query = request.args.get('search', '', type=str)
+
+    with session_scope() as session:
+        query = session.query(Book).options(joinedload(Book.genres))
+
+        if genre_id:
+            query = query.join(Book.genres).filter(Genre.id == genre_id)
+
+        if search_query:
+            query = query.filter(Book.name.ilike(f'%{search_query}%'))
+
+        books = query.all()
+
+        top_books = (
+            session.query(Book)
+            .options(joinedload(Book.genres))
+            .order_by(Book.rating.desc())
+            .limit(3)
+            .all()
+        )
+
+        books_data = [
+            {
+                "id": book.id,
+                "name": book.name,
+                "author": book.author,
+                "price": book.price,
+                "cover": book.cover,
+                "rating": book.rating,
+                "genres": [genre.name for genre in book.genres],
+            }
+            for book in books
+        ]
+
+        top_books_data = [
+            {
+                "name": book.name,
+                "author": book.author,
+                "cover": book.cover,
+                "rating": book.rating,
+            }
+            for book in top_books
+        ]
+
+        genres_tree = get_genre_hierarchy(session)
+
+    return render_template(
+        "index.html",
+        books=books_data,
+        top_books=top_books_data,
+        genres=genres_tree
+    )
+
+### --- Регистрация маршрутов --- ###
 
 def register_routes(app):
     app.register_blueprint(bp)
+
+
+@bp.route('/book/<int:book_id>')
+def book_detail(book_id):
+    with session_scope() as session:
+        book = session.query(Book).options(joinedload(Book.genres)).get(book_id)
+        if not book:
+            return render_template('404.html'), 404
+
+        return render_template('book_detail.html', book=book)

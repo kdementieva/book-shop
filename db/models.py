@@ -6,10 +6,11 @@ from datetime import datetime
 
 Base = declarative_base()
 
-book_genre_association = Table(
-    'book_genre', Base.metadata,
-    Column('book_id', ForeignKey('books.id'), primary_key=True),
-    Column('genre_id', ForeignKey('genres.id'), primary_key=True)
+# Таблица-связка многие-ко-многим для книг и жанров
+book_genres = Table(
+    'book_genres', Base.metadata,
+    Column('book_id', Integer, ForeignKey('books.id'), primary_key=True),
+    Column('genre_id', Integer, ForeignKey('genres.id'), primary_key=True)
 )
 
 class User(Base, UserMixin):
@@ -27,11 +28,16 @@ class User(Base, UserMixin):
 
 class Genre(Base):
     __tablename__ = 'genres'
-
+    
     id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True, nullable=False)
+    name = Column(String, nullable=False)
+    parent_id = Column(Integer, ForeignKey('genres.id'), nullable=True)
 
-    books = relationship('Book', secondary=book_genre_association, back_populates='genres')
+    # Иерархия жанров (родитель - поджанры)
+    parent = relationship("Genre", remote_side=[id], backref="subgenres")
+
+    # Книги, связанные с жанром
+    books = relationship("Book", secondary=book_genres, back_populates="genres")
 
 class Book(Base):
     __tablename__ = 'books'
@@ -44,7 +50,8 @@ class Book(Base):
     description = Column(String(500))
     rating = Column(Float, default=0.0)
 
-    genres = relationship('Genre', secondary=book_genre_association, back_populates='books')
+    # Жанры, к которым принадлежит книга
+    genres = relationship("Genre", secondary=book_genres, back_populates="books")
     reviews = relationship('Review', back_populates='book')
     order_items = relationship('OrderItem', back_populates='book')
 
@@ -94,4 +101,3 @@ class Review(Base):
 
     user = relationship('User', back_populates='reviews')
     book = relationship('Book', back_populates='reviews')
-
