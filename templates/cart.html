@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Корзина — BookShop{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8">
+  <h2 class="text-2xl font-bold mb-6">🛒 Ваша корзина</h2>
+
+  {% if cart_items %}
+    <div class="overflow-x-auto">
+      <table class="w-full table-auto border-collapse">
+        <thead class="bg-gray-100 text-left text-sm text-gray-600">
+          <tr>
+            <th class="p-3">Книга</th>
+            <th class="p-3">Автор</th>
+            <th class="p-3">Цена</th>
+            <th class="p-3">Кол-во</th>
+            <th class="p-3">Сумма</th>
+            <th class="p-3">Удалить</th>
+          </tr>
+        </thead>
+        <tbody class="text-sm text-gray-700 divide-y">
+          {% for item in cart_items %}
+          <tr>
+            <td class="p-3">{{ item.book.name }}</td>
+            <td class="p-3">{{ item.book.author }}</td>
+            <td class="p-3">{{ item.book.price }} ₽</td>
+            <td class="p-3">
+              <form method="POST" action="{{ url_for('main.update_cart', item_id=item.id) }}" class="flex items-center gap-2">
+                <button name="action" value="decrease" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 text-lg">–</button>
+                <span class="px-3">{{ item.quantity }}</span>
+                <button name="action" value="increase" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 text-lg">+</button>
+              </form>
+            </td>
+            <td class="p-3">{{ item.book.price * item.quantity }} ₽</td>
+            <td class="p-3">
+              <form method="POST" action="{{ url_for('main.remove_from_cart', item_id=item.id) }}">
+                <button type="submit" class="text-red-600 hover:underline text-sm">Удалить</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-6 text-right">
+      <p class="text-lg font-semibold mb-4">Итого: {{ total }} ₽</p>
+      <a href="{{ url_for('main.checkout') }}" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+        Оформить заказ
+      </a>
+    </div>
+
+  {% else %}
+    <p class="text-gray-600">Ваша корзина пуста.</p>
+  {% endif %}
+</div>
+{% endblock %}

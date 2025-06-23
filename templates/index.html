@@ -1,140 +1,86 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <title>Главная — Книжный магазин</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
+{% extends "base.html" %}
 
-  <!-- Навбар -->
-  <header class="bg-white shadow p-4 flex justify-between items-center">
-    <h1 class="text-xl font-bold text-blue-700">📚 BookShop</h1>
-    <nav class="space-x-4 text-sm">
-      {% if current_user.is_authenticated %}
-        <a href="{{ url_for('main.profile') }}" class="text-blue-600 hover:underline">Профиль</a>
-        <a href="#" class="text-blue-600 hover:underline">Заказы</a>
-        <a href="#" class="text-blue-600 hover:underline">Корзина</a>
-        <a href="{{ url_for('main.logout') }}" class="text-red-500 hover:underline">Выйти</a>
-      {% else %}
-        <a href="{{ url_for('main.login') }}" class="text-blue-600 hover:underline">Вход</a>
-        <a href="{{ url_for('main.register') }}" class="text-blue-600 hover:underline">Регистрация</a>
-      {% endif %}
-    </nav>
-  </header>
+{% block title %}Главная — Книжный магазин{% endblock %}
 
-  <!-- Контент -->
-  <div class="p-6 max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-6 flex-grow">
+{% block content %}
+<div class="p-6 max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-6 flex-grow">
 
-    <!-- Каталог жанров -->
-    <aside class="md:col-span-1">
-      <h2 class="text-lg font-semibold mb-4">📂 Каталог книг</h2>
-      <ul class="space-y-2">
-        {% for genre in genres %}
-          <li>
-            <details class="group">
-              <summary class="cursor-pointer px-4 py-2 rounded bg-blue-50 hover:bg-blue-100 text-blue-800 text-sm">
-                {{ genre.name }}
-              </summary>
-              {% if genre.subgenres %}
-              <ul class="ml-4 mt-2 space-y-1 text-sm text-gray-700">
-                {% for sub in genre.subgenres %}
-                  <li>
-                    {% if sub.subgenres %}
-                      <details>
-                        <summary class="cursor-pointer">{{ sub.name }}</summary>
-                        <ul class="ml-4 mt-1 space-y-1 text-sm text-gray-600">
-                          {% for subsub in sub.subgenres %}
-                            <li><a href="{{ url_for('main.index', genre_id=subsub.id) }}" class="hover:underline">– {{ subsub.name }}</a></li>
-                          {% endfor %}
-                        </ul>
-                      </details>
-                    {% else %}
-                      <a href="{{ url_for('main.index', genre_id=sub.id) }}" class="hover:underline">– {{ sub.name }}</a>
-                    {% endif %}
-                  </li>
-                {% endfor %}
-              </ul>
-              {% endif %}
-            </details>
-          </li>
+  <!-- Каталог жанров -->
+  <aside class="md:col-span-1">
+    <h2 class="text-lg font-semibold mb-4">📂 Каталог книг</h2>
+    <ul class="space-y-2">
+      {% for genre in genres %}
+        <li>
+          <details class="group">
+            <summary class="cursor-pointer px-4 py-2 rounded bg-blue-50 hover:bg-blue-100 text-blue-800 text-sm">
+              {{ genre.name }}
+            </summary>
+            {% if genre.subgenres %}
+            <ul class="ml-4 mt-2 space-y-1 text-sm text-gray-700">
+              {% for sub in genre.subgenres %}
+                <li>
+                  {% if sub.subgenres %}
+                    <details>
+                      <summary class="cursor-pointer">{{ sub.name }}</summary>
+                      <ul class="ml-4 mt-1 space-y-1 text-sm text-gray-600">
+                        {% for subsub in sub.subgenres %}
+                          <li><a href="{{ url_for('main.index', genre_id=subsub.id) }}" class="hover:underline">– {{ subsub.name }}</a></li>
+                        {% endfor %}
+                      </ul>
+                    </details>
+                  {% else %}
+                    <a href="{{ url_for('main.index', genre_id=sub.id) }}" class="hover:underline">– {{ sub.name }}</a>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </details>
+        </li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <!-- Основной контент -->
+  <main class="md:col-span-3 space-y-8">
+
+    <!-- Поиск -->
+    <form method="GET" action="{{ url_for('main.index') }}" class="mb-4">
+      <input type="text" name="search" placeholder="Поиск книг..." value="{{ request.args.get('search', '') }}" class="w-full px-4 py-2 border rounded shadow-sm">
+    </form>
+
+    <!-- ТОП-3 книги -->
+    <div>
+      <h2 class="text-xl font-semibold mb-3">🌟 ТОП-3 книги недели</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        {% for book in top_books %}
+        <div class="bg-white rounded shadow p-4">
+          <img src="{{ book.cover }}" alt="Обложка" class="h-48 w-full object-cover rounded mb-3">
+          <h3 class="font-bold text-lg mb-1">{{ book.name }}</h3>
+          <p class="text-sm text-gray-600 mb-1">Автор: {{ book.author }}</p>
+          <p class="text-sm text-gray-500">Оценка: {{ book.rating }}</p>
+        </div>
         {% endfor %}
-      </ul>
-    </aside>
-
-    <!-- Основной контент -->
-    <main class="md:col-span-3 space-y-8">
-
-      <!-- Поиск -->
-      <form method="GET" action="{{ url_for('main.index') }}" class="mb-4">
-        <input type="text" name="search" placeholder="Поиск книг..." value="{{ request.args.get('search', '') }}" class="w-full px-4 py-2 border rounded shadow-sm">
-      </form>
-
-      <!-- ТОП-3 книги -->
-      <div>
-        <h2 class="text-xl font-semibold mb-3">🌟 ТОП-3 книги недели</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {% for book in top_books %}
-          <div class="bg-white rounded shadow p-4">
-            <img src="{{ book.cover }}" alt="Обложка" class="h-48 w-full object-cover rounded mb-3">
-            <h3 class="font-bold text-lg mb-1">{{ book.name }}</h3>
-            <p class="text-sm text-gray-600 mb-1">Автор: {{ book.author }}</p>
-            <p class="text-sm text-gray-500">Оценка: {{ book.rating }}</p>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <!-- Все книги -->
-      <div>
-        <h2 class="text-xl font-semibold mb-3">📖 Все книги</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {% for book in books %}
-          <div class="bg-white rounded shadow p-4 flex flex-col">
-            <img src="{{ book.cover }}" alt="Обложка" class="h-48 object-cover rounded mb-3">
-            <h3 class="text-lg font-semibold mb-1">{{ book.name }}</h3>
-            <p class="text-sm text-gray-600 mb-1">Автор: {{ book.author }}</p>
-            <p class="text-sm text-gray-600 mb-1">Цена: {{ book.price }} ₽</p>
-            <p class="text-sm text-gray-500 mb-2">Жанры: {{ book.genres | join(', ') }}</p>
-            <a href="{{ url_for('main.book_detail', book_id=book.id) }}" class="mt-auto text-center bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">Подробнее</a>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-
-    </main>
-  </div>
-
-  <!-- Футер -->
-  <footer class="bg-white mt-16 py-8 border-t">
-    <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-sm text-gray-700">
-      <div>
-        <h3 class="text-base font-semibold mb-2">📞 Контакты</h3>
-        <p>Email: support@bookshop.com</p>
-        <p>Телефон: +48 123 456 789</p>
-        <p>Адрес: ул. Книжная 1, Варшава</p>
-      </div>
-      <div>
-        <h3 class="text-base font-semibold mb-2">🚚 Способы доставки</h3>
-        <ul class="list-disc list-inside">
-          <li>Самовывоз</li>
-          <li>Курьер до двери</li>
-          <li>Почта Польши</li>
-          <li>InPost Paczkomat</li>
-        </ul>
-      </div>
-      <div>
-        <h3 class="text-base font-semibold mb-2">💳 Способы оплаты</h3>
-        <ul class="list-disc list-inside">
-          <li>Оплата картой</li>
-          <li>Банковский перевод</li>
-          <li>Blik</li>
-          <li>Оплата при получении</li>
-        </ul>
       </div>
     </div>
-    <div class="text-center text-xs text-gray-500 mt-8">© 2025 BookShop. Все права защищены.</div>
-  </footer>
 
-</body>
-</html>
+    <!-- Все книги -->
+    <div>
+      <h2 class="text-xl font-semibold mb-3">📖 Все книги</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for book in books %}
+        <div class="bg-white rounded shadow p-4 flex flex-col">
+          <img src="{{ book.cover }}" alt="Обложка" class="h-48 object-cover rounded mb-3">
+          <h3 class="text-lg font-semibold mb-1">{{ book.name }}</h3>
+          <p class="text-sm text-gray-600 mb-1">Автор: {{ book.author }}</p>
+          <p class="text-sm text-gray-600 mb-1">Цена: {{ book.price }} ₽</p>
+          <p class="text-sm text-gray-500 mb-2">Жанры: {{ book.genres | join(', ') }}</p>
+          <a href="{{ url_for('main.book_detail', book_id=book.id) }}" class="mt-auto text-center bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">Подробнее</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}

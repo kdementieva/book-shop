@@ -1,7 +1,7 @@
 from flask import Blueprint, request, redirect, render_template, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from db.models import User, Genre, Book
+from db.models import User, Genre, Book, CartItem
 from db.database import session_scope
 from sqlalchemy.orm import joinedload
 
@@ -149,4 +149,108 @@ def book_detail(book_id):
         if not book:
             return render_template('404.html'), 404
 
-        return render_template('book_detail.html', book=book)
+        # Создаём копию данных до выхода из with
+        book_data = {
+            'id': book.id,
+            'name': book.name,
+            'author': book.author,
+            'price': book.price,
+            'cover': book.cover,
+            'description': book.description,
+            'rating': book.rating,
+            'year': getattr(book, 'year', None),
+            'genres': [g.name for g in book.genres]
+        }
+
+    return render_template('book_detail.html', book=book_data)
+
+
+@bp.route('/cart/add/<int:book_id>', methods=['POST'])
+@login_required
+def add_to_cart(book_id):
+    from db.models import CartItem, Book
+    with session_scope() as session:
+        book = session.query(Book).get(book_id)
+        if not book:
+            flash("Книга не найдена.")
+            return redirect(url_for('main.index'))
+
+        # Проверка, есть ли уже эта книга в корзине
+        item = session.query(CartItem).filter_by(user_id=current_user.id, book_id=book_id).first()
+        if item:
+            item.quantity += 1
+        else:
+            new_item = CartItem(user_id=current_user.id, book_id=book_id, quantity=1)
+            session.add(new_item)
+
+        flash("Книга добавлена в корзину!")
+    return redirect(url_for('main.book_detail', book_id=book_id))
+
+@bp.route('/book/<int:book_id>/review', methods=['GET', 'POST'])
+@login_required
+def leave_review(book_id):
+    flash("Форма отзыва пока не реализована.")
+    return redirect(url_for('main.book_detail', book_id=book_id))
+
+@bp.route('/cart')
+@login_required
+def show_cart():
+    from db.models import CartItem, Book
+
+    with session_scope() as session:
+        items = (
+            session.query(CartItem)
+            .filter_by(user_id=current_user.id)
+            .join(Book)
+            .all()
+        )
+
+        total = sum(item.book.price * item.quantity for item in items)
+
+        # Экспортируем объекты как есть — шаблон использует item.book.name и т.д.
+        session.expunge_all()  # отсоединить от сессии
+
+    return render_template("cart.html", cart_items=items, total=total)
+
+from db.database import session_scope
+
+@bp.route('/cart/remove/<int:item_id>', methods=['POST'])
+@login_required
+def remove_from_cart(item_id):
+    from db.models import CartItem  # если не импортирован выше
+
+    with session_scope() as session:
+        item = session.query(CartItem).get(item_id)
+
+        if item and item.user_id == current_user.id:
+            session.delete(item)
+            session.commit()
+
+    return redirect(url_for('main.show_cart'))
+
+@bp.route('/cart/update/<int:item_id>', methods=['POST'])
+@login_required
+def update_cart(item_id):
+    with session_scope() as session:
+        item = session.get(CartItem, item_id)
+
+        if item and item.user_id == current_user.id:
+            action = request.form.get('action')
+
+            if action == 'increase':
+                item.quantity += 1
+            elif action == 'decrease' and item.quantity > 1:
+                item.quantity -= 1
+
+            session.commit()
+
+    return redirect(url_for('main.show_cart'))
+
+
+@bp.route('/checkout')
+@login_required
+def checkout():
+    return "Оформление заказа в разработке"
+
+
+

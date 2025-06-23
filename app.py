@@ -4,6 +4,7 @@ from db.database import init_db
 from flask_login import LoginManager
 from db.models import User
 import routes
+from flask import render_template
 
 app = Flask(import_name=__name__)
 app.config['SECRET_KEY'] = settings.SECRET_KEY
@@ -21,6 +22,10 @@ def load_user(user_id):
         user = session.query(User).get(int(user_id))
         session.expunge(user) 
         return user
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template("404.html"), 404
 
 if __name__ == '__main__':
     init_db()
