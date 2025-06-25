@@ -3,7 +3,6 @@ from db.database import session_scope, init_db
 from db.models import Book, Genre
 from pathlib import Path
 
-# Словарь соответствия поджанров и родительских жанров
 SUBGENRE_TO_PARENT = {
     "Фантастика": "Художественная литература",
     "Фэнтези": "Художественная литература",
@@ -30,7 +29,6 @@ with session_scope() as session:
         subgenre_name = item["genre"]
         parent_name = SUBGENRE_TO_PARENT.get(subgenre_name)
 
-        # 1. Родительский жанр
         if parent_name:
             parent_key = f"parent:{parent_name}"
             if parent_key not in genre_cache:
@@ -45,7 +43,6 @@ with session_scope() as session:
         else:
             parent_genre = None
 
-        # 2. Поджанр
         subgenre_key = f"{parent_name}:{subgenre_name}" if parent_genre else subgenre_name
         if subgenre_key not in genre_cache:
             genre = session.query(Genre).filter_by(name=subgenre_name).first()
@@ -57,7 +54,6 @@ with session_scope() as session:
         else:
             genre = genre_cache[subgenre_key]
 
-        # 3. Книга
         book = Book(
             name=item["title"],
             author=item["author"],

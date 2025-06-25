@@ -6,7 +6,6 @@ from datetime import datetime
 
 Base = declarative_base()
 
-# Таблица-связка многие-ко-многим для книг и жанров
 book_genres = Table(
     'book_genres', Base.metadata,
     Column('book_id', Integer, ForeignKey('books.id'), primary_key=True),
@@ -33,10 +32,8 @@ class Genre(Base):
     name = Column(String, nullable=False)
     parent_id = Column(Integer, ForeignKey('genres.id'), nullable=True)
 
-    # Иерархия жанров (родитель - поджанры)
     parent = relationship("Genre", remote_side=[id], backref="subgenres")
 
-    # Книги, связанные с жанром
     books = relationship("Book", secondary=book_genres, back_populates="genres")
 
 class Book(Base):
@@ -50,7 +47,6 @@ class Book(Base):
     description = Column(String(500))
     rating = Column(Float, default=0.0)
 
-    # Жанры, к которым принадлежит книга
     genres = relationship("Genre", secondary=book_genres, back_populates="books")
     reviews = relationship('Review', back_populates='book')
     order_items = relationship('OrderItem', back_populates='book')

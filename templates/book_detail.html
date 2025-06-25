@@ -5,12 +5,10 @@
 {% block content %}
 <main class="max-w-5xl mx-auto p-6 bg-white shadow mt-6 rounded-lg flex flex-col md:flex-row gap-6">
 
-  <!-- Обложка -->
   <div class="md:w-1/3">
     <img src="{{ book['cover'] }}" alt="Обложка книги" class="rounded shadow w-full object-cover">
   </div>
 
-  <!-- Информация -->
   <div class="md:w-2/3 space-y-4">
     <h2 class="text-3xl font-bold text-gray-800">{{ book['name'] }}</h2>
     <p class="text-gray-600 text-sm">Автор: <span class="font-medium">{{ book['author'] }}</span></p>
@@ -24,7 +22,6 @@
     <p class="text-sm text-gray-700">{{ book['description'] }}</p>
     <p class="text-sm text-yellow-600">Оценка: {{ "%.1f"|format(book['rating']) }}/5 ⭐</p>
 
-    <!-- Кнопки -->
     <div class="flex flex-col sm:flex-row gap-4 mt-6">
       <form method="POST" action="{{ url_for('main.add_to_cart', book_id=book['id']) }}">
         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded transition w-full sm:w-auto">
@@ -40,6 +37,24 @@
       {% endif %}
     </div>
   </div>
+
+  {% if book.reviews %}
+  <div class="mt-10">
+    <h3 class="text-lg font-semibold mb-3">Отзывы:</h3>
+    <ul class="space-y-4">
+      {% for review in book.reviews %}
+        <li class="border-b pb-3">
+          <p class="text-sm text-gray-800">Оценка: {{ review.grade }} ⭐</p>
+          <p class="text-gray-700">{{ review.review }}</p>
+          <p class="text-xs text-gray-500 mt-1">Автор: {{ review.user.username }}</p>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  <p class="text-gray-600 mt-6">Пока нет отзывов.</p>
+{% endif %}
+
 
 </main>
 {% endblock %}

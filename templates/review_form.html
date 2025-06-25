@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Оставить отзыв — BookShop{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white p-6 mt-10 rounded shadow">
+  <h2 class="text-xl font-bold mb-4">📝 Оставить отзыв о книге</h2>
+
+  <form method="POST" class="space-y-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700">Оценка (1–5)</label>
+      <select name="grade" required class="w-full px-4 py-2 border rounded">
+        {% for i in range(1, 6) %}
+          <option value="{{ i }}">{{ i }} ⭐</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700">Ваш отзыв</label>
+      <textarea name="review" rows="4" required class="w-full px-4 py-2 border rounded"></textarea>
+    </div>
+    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+      Отправить
+    </button>
+  </form>
+</div>
+{% endblock %}

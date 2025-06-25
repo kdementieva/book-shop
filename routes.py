@@ -1,13 +1,11 @@
 from flask import Blueprint, request, redirect, render_template, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from db.models import User, Genre, Book, CartItem
+from db.models import User, Genre, Book, CartItem, Order, OrderItem, Review
 from db.database import session_scope
 from sqlalchemy.orm import joinedload
 
 bp = Blueprint('main', __name__)
-
-### --- Аутентификация --- ###
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -20,7 +18,7 @@ def login():
             if user and check_password_hash(user.password_hash, password):
                 session.expunge(user)
                 login_user(user)
-                return redirect(url_for('main.profile'))
+                return redirect(url_for('main.index'))
             else:
                 flash('Неправильный email или пароль')
     return render_template('login.html')
@@ -59,13 +57,6 @@ def register():
 
     return render_template('register.html')
 
-@bp.route('/profile')
-@login_required
-def profile():
-    return render_template("profile.html", user=current_user)
-
-### --- Вспомогательная функция жанров --- ###
-
 def get_genre_hierarchy(session):
     root_genres = session.query(Genre).filter_by(parent_id=None).all()
 
@@ -77,8 +68,6 @@ def get_genre_hierarchy(session):
         }
 
     return [serialize(g) for g in root_genres]
-
-### --- Главная страница --- ###
 
 @bp.route('/')
 def index():
@@ -136,8 +125,6 @@ def index():
         genres=genres_tree
     )
 
-### --- Регистрация маршрутов --- ###
-
 def register_routes(app):
     app.register_blueprint(bp)
 
@@ -149,7 +136,6 @@ def book_detail(book_id):
         if not book:
             return render_template('404.html'), 404
 
-        # Создаём копию данных до выхода из with
         book_data = {
             'id': book.id,
             'name': book.name,
@@ -161,6 +147,12 @@ def book_detail(book_id):
             'year': getattr(book, 'year', None),
             'genres': [g.name for g in book.genres]
         }
+
+        book_data['reviews'] = [
+        {"review": r.review, "grade": r.grade, "user": {"username": r.user.username}}
+        for r in book.reviews
+        ]
+
 
     return render_template('book_detail.html', book=book_data)
 
@@ -175,7 +167,6 @@ def add_to_cart(book_id):
             flash("Книга не найдена.")
             return redirect(url_for('main.index'))
 
-        # Проверка, есть ли уже эта книга в корзине
         item = session.query(CartItem).filter_by(user_id=current_user.id, book_id=book_id).first()
         if item:
             item.quantity += 1
@@ -186,11 +177,6 @@ def add_to_cart(book_id):
         flash("Книга добавлена в корзину!")
     return redirect(url_for('main.book_detail', book_id=book_id))
 
-@bp.route('/book/<int:book_id>/review', methods=['GET', 'POST'])
-@login_required
-def leave_review(book_id):
-    flash("Форма отзыва пока не реализована.")
-    return redirect(url_for('main.book_detail', book_id=book_id))
 
 @bp.route('/cart')
 @login_required
@@ -206,9 +192,7 @@ def show_cart():
         )
 
         total = sum(item.book.price * item.quantity for item in items)
-
-        # Экспортируем объекты как есть — шаблон использует item.book.name и т.д.
-        session.expunge_all()  # отсоединить от сессии
+        session.expunge_all() 
 
     return render_template("cart.html", cart_items=items, total=total)
 
@@ -217,7 +201,7 @@ from db.database import session_scope
 @bp.route('/cart/remove/<int:item_id>', methods=['POST'])
 @login_required
 def remove_from_cart(item_id):
-    from db.models import CartItem  # если не импортирован выше
+    from db.models import CartItem 
 
     with session_scope() as session:
         item = session.query(CartItem).get(item_id)
@@ -247,10 +231,117 @@ def update_cart(item_id):
     return redirect(url_for('main.show_cart'))
 
 
-@bp.route('/checkout')
+from db.models import CartItem, Book, Order, OrderItem
+
+@bp.route('/checkout', methods=['GET', 'POST'])
 @login_required
 def checkout():
-    return "Оформление заказа в разработке"
+    if request.method == 'POST':
+        delivery_method = request.form.get('delivery_method')
+        address = request.form.get('address', '').strip()
+
+        if delivery_method == 'door' and not address:
+            flash("Пожалуйста, введите адрес доставки.")
+            return redirect(url_for('main.checkout'))
+
+        if delivery_method == 'pickup':
+            address = "Самовывоз"
+
+        with session_scope() as session:
+            items = (
+                session.query(CartItem)
+                .filter_by(user_id=current_user.id)
+                .join(Book)
+                .all()
+            )
+
+            if not items:
+                flash("Корзина пуста.")
+                return redirect(url_for('main.index'))
+
+            new_order = Order(
+                user_id=current_user.id,
+                status="pending",
+                address=address
+            )
+            session.add(new_order)
+            session.flush()
+
+            for item in items:
+                order_item = OrderItem(
+                    order_id=new_order.id,
+                    book_id=item.book.id,
+                    quantity=item.quantity,
+                    price=item.book.price
+                )
+                session.add(order_item)
+
+            for item in items:
+                session.delete(item)
+
+            flash("Заказ успешно оформлен!")
+
+        return redirect(url_for('main.orders'))
+
+    return render_template("checkout.html")
 
 
+@bp.route('/orders')
+@login_required
+def orders():
+    from db.models import Order, OrderItem, Book
 
+    with session_scope() as session:
+        user_orders = (
+            session.query(Order)
+            .filter_by(user_id=current_user.id)
+            .order_by(Order.date.desc())
+            .all()
+        )
+
+        for order in user_orders:
+            for item in order.items:
+                _ = item.book.name 
+
+        session.expunge_all()
+
+    return render_template("orders.html", orders=user_orders)
+
+@bp.route('/book/<int:book_id>/review', methods=['GET', 'POST'])
+@login_required
+def leave_review(book_id):
+    with session_scope() as session:
+        book = session.query(Book).get(book_id)
+        if not book:
+            flash("Книга не найдена.")
+            return redirect(url_for('main.index'))
+
+        existing = session.query(Review).filter_by(book_id=book_id, user_id=current_user.id).first()
+
+        if request.method == 'POST':
+            if existing:
+                flash("Вы уже оставили отзыв на эту книгу.")
+                return redirect(url_for('main.book_detail', book_id=book_id))
+
+            review_text = request.form.get("review", "").strip()
+            grade = int(request.form.get("grade", 0))
+
+            if not (1 <= grade <= 5):
+                flash("Оценка должна быть от 1 до 5.")
+                return redirect(request.url)
+
+            new_review = Review(
+                review=review_text,
+                grade=grade,
+                book_id=book_id,
+                user_id=current_user.id
+            )
+            session.add(new_review)
+            
+            reviews = session.query(Review).filter_by(book_id=book_id).all()
+            book.rating = sum(r.grade for r in reviews + [new_review]) / (len(reviews) + 1)
+
+            flash("Спасибо за отзыв!")
+            return redirect(url_for('main.book_detail', book_id=book_id))
+
+    return render_template("review_form.html")
