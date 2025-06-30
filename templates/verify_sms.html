@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Подтверждение SMS — BookShop{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-[60vh] text-center px-4">
+  <div class="max-w-md w-full bg-white shadow-md rounded px-8 py-6">
+    <h1 class="text-3xl font-bold text-blue-700 mb-4">Подтверждение SMS</h1>
+    <p class="text-gray-700 mb-6">
+      Пожалуйста, введите код, который мы отправили вам в SMS (имитация).
+    </p>
+    <form method="post" action="{{ url_for('main.verify_sms') }}">
+      <div class="mb-4">
+        <input 
+          type="text" 
+          name="code" 
+          placeholder="Введите код" 
+          required 
+          class="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+        >
+      </div>
+      <button 
+        type="submit" 
+        class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+        Подтвердить
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

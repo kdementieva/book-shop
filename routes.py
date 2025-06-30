@@ -4,6 +4,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db.models import User, Genre, Book, CartItem, Order, OrderItem, Review
 from db.database import session_scope
 from sqlalchemy.orm import joinedload
+import random
+from flask import session
 
 bp = Blueprint('main', __name__)
 
@@ -29,6 +31,9 @@ def logout():
     logout_user()
     return redirect(url_for('main.login'))
 
+import random
+from flask import session
+
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -37,25 +42,26 @@ def register():
         phone = request.form['phone']
         password = request.form['password']
 
-        password_hash = generate_password_hash(password)
-
-        with session_scope() as session:
-            if session.query(User).filter_by(email=email).first():
+        with session_scope() as session_db:
+            if session_db.query(User).filter_by(email=email).first():
                 flash('Пользователь с таким email уже существует')
                 return redirect(url_for('main.register'))
 
-            user = User(
-                username=username,
-                email=email,
-                phone_number=phone,
-                password_hash=password_hash
-            )
-            session.add(user)
+        verification_code = random.randint(1000, 9999)
 
-        flash('Регистрация успешна! Теперь войдите в аккаунт.')
-        return redirect(url_for('main.login'))
+        session['register_data'] = {
+            'username': username,
+            'email': email,
+            'phone': phone,
+            'password': password,
+            'verification_code': str(verification_code)
+        }
+
+        flash(f"Ваш код для имитации SMS: {verification_code}")
+        return redirect(url_for('main.verify_sms'))
 
     return render_template('register.html')
+
 
 def get_genre_hierarchy(session):
     root_genres = session.query(Genre).filter_by(parent_id=None).all()
@@ -165,7 +171,7 @@ def add_to_cart(book_id):
         book = session.query(Book).get(book_id)
         if not book:
             flash("Книга не найдена.")
-            return redirect(url_for('main.index'))
+            return redirect(url_for('main.login'))
 
         item = session.query(CartItem).filter_by(user_id=current_user.id, book_id=book_id).first()
         if item:
@@ -345,3 +351,32 @@ def leave_review(book_id):
             return redirect(url_for('main.book_detail', book_id=book_id))
 
     return render_template("review_form.html")
+
+@bp.route('/verify_sms', methods=['GET', 'POST'])
+def verify_sms():
+    if request.method == 'POST':
+        code_entered = request.form.get('code', '').strip()
+        reg_data = session.get('register_data')
+
+        if not reg_data:
+            flash("Сессия устарела. Зарегистрируйтесь снова.")
+            return redirect(url_for('main.register'))
+
+        if code_entered != reg_data['verification_code']:
+            flash("Неправильный код.")
+            return redirect(url_for('main.verify_sms'))
+
+        with session_scope() as session_db:
+            user = User(
+                username=reg_data['username'],
+                email=reg_data['email'],
+                phone_number=reg_data['phone'],
+                password_hash=generate_password_hash(reg_data['password'])
+            )
+            session_db.add(user)
+
+        flash("Регистрация успешна! Теперь войдите в аккаунт.")
+        session.pop('register_data', None)
+        return redirect(url_for('main.login'))
+
+    return render_template('verify_sms.html')
